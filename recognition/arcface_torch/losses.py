@@ -1,42 +1,47 @@
 import torch
-from torch import nn
+import math
+
+class ArcFace(torch.nn.Module):
+    """ ArcFace (https://arxiv.org/pdf/1801.07698v1.pdf):
+    """
+    def __init__(self, s=64.0, margin=0.5):
+        super(ArcFace, self).__init__()
+        self.scale = s
+        self.cos_m = math.cos(margin)
+        self.sin_m = math.sin(margin)
+        self.theta = math.cos(math.pi - margin)
+        self.sinmm = math.sin(math.pi - margin) * margin
+        self.easy_margin = False
 
 
-def get_loss(name):
-    if name == "cosface":
-        return CosFace()
-    elif name == "arcface":
-        return ArcFace()
-    else:
-        raise ValueError()
+    def forward(self, logits: torch.Tensor, labels: torch.Tensor):
+        index = torch.where(labels != -1)[0]
+        target_logit = logits[index, labels[index].view(-1)]
+
+        sin_theta = torch.sqrt(1.0 - torch.pow(target_logit, 2))
+        cos_theta_m = target_logit * self.cos_m - sin_theta * self.sin_m  # cos(target+margin)
+        if self.easy_margin:
+            final_target_logit = torch.where(
+                target_logit > 0, cos_theta_m, target_logit)
+        else:
+            final_target_logit = torch.where(
+                target_logit > self.theta, cos_theta_m, target_logit - self.sinmm)
+
+        logits[index, labels[index].view(-1)] = final_target_logit
+        logits = logits * self.scale
+        return logits
 
 
-class CosFace(nn.Module):
+class CosFace(torch.nn.Module):
     def __init__(self, s=64.0, m=0.40):
         super(CosFace, self).__init__()
         self.s = s
         self.m = m
 
-    def forward(self, cosine, label):
-        index = torch.where(label != -1)[0]
-        m_hot = torch.zeros(index.size()[0], cosine.size()[1], device=cosine.device)
-        m_hot.scatter_(1, label[index, None], self.m)
-        cosine[index] -= m_hot
-        ret = cosine * self.s
-        return ret
-
-
-class ArcFace(nn.Module):
-    def __init__(self, s=64.0, m=0.5):
-        super(ArcFace, self).__init__()
-        self.s = s
-        self.m = m
-
-    def forward(self, cosine: torch.Tensor, label):
-        index = torch.where(label != -1)[0]
-        m_hot = torch.zeros(index.size()[0], cosine.size()[1], device=cosine.device)
-        m_hot.scatter_(1, label[index, None], self.m)
-        cosine.acos_()
-        cosine[index] += m_hot
-        cosine.cos_().mul_(self.s)
-        return cosine
+    def forward(self, logits: torch.Tensor, labels: torch.Tensor):
+        index = torch.where(labels != -1)[0]
+        target_logit = logits[index, labels[index].view(-1)]
+        final_target_logit = target_logit - self.m
+        logits[index, labels[index].view(-1)] = final_target_logit
+        logits = logits * self.s
+        return logits
