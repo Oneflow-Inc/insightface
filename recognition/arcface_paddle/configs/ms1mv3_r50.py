@@ -20,7 +20,7 @@ config.backbone = 'FresResNet50'
 config.classifier = 'LargeScaleClassifier'
 config.embedding_size = 512
 config.model_parallel = True
-config.sample_ratio = 0.1
+config.sample_ratio = 1
 config.loss = 'ArcFace'
 config.dropout = 0.0
 
@@ -33,7 +33,7 @@ config.warmup_num = 0
 config.train_num = 25
 config.decay_boundaries = [10, 16, 22]
 
-config.use_synthetic_dataset = False
+config.use_synthetic_dataset = True
 config.dataset = "MS1M_v3"
 config.data_dir = "./MS1M_v3"
 config.label_file = "./MS1M_v3/label.txt"
